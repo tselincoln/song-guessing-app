@@ -5,27 +5,52 @@
         {
           "title": "Super Shy",
           "path": "assets/songs/newjeans/super_shy.mp3",
-          "popularity": 148239570
+          "popularity": 148240212
         },
         {
           "title": "NewJeans 'New Jeans (ft. The Powerpuff Girls)' Lyrics",
           "path": "assets/songs/newjeans/newjeans_new_jeans_ft_the_powerpuff_girls_lyrics.mp3",
-          "popularity": 17752216
+          "popularity": 17752341
         },
         {
           "title": "NewJeans 'New Jeans' Official MV",
           "path": "assets/songs/newjeans/newjeans_new_jeans_official_mv.mp3",
-          "popularity": 42253964
+          "popularity": 42254089
         },
         {
           "title": "NewJeans - NewJeans [Audio]",
           "path": "assets/songs/newjeans/newjeans_newjeans_audio.mp3",
-          "popularity": 1482033
+          "popularity": 1482043
         },
         {
           "title": "Get Up",
           "path": "assets/songs/newjeans/get_up.mp3",
-          "popularity": 23715715
+          "popularity": 23715738
+        },
+        {
+          "title": "NewJeans \u2018Supernatural\u2019 Official MV (Part.1)",
+          "path": "assets/songs/newjeans/newjeans_supernatural_official_mv_part_1.mp3",
+          "popularity": 91957127
+        },
+        {
+          "title": "NewJeans (\u30cb\u30e5\u30fc\u30b8\u30fc\u30f3\u30ba) 'Supernatural' Official Audio",
+          "path": "assets/songs/newjeans/newjeans_supernatural_official_audio.mp3",
+          "popularity": 676948
+        },
+        {
+          "title": "NewJeans 'Hype Boy' Official MV (Performance ver.1)",
+          "path": "assets/songs/newjeans/newjeans_hype_boy_official_mv_performance_ver_1.mp3",
+          "popularity": 246799474
+        },
+        {
+          "title": "NewJeans - Hype Boy \u300cOfficial Audio\u300d",
+          "path": "assets/songs/newjeans/newjeans_hype_boy_official_audio.mp3",
+          "popularity": 2983739
+        },
+        {
+          "title": "NewJeans 'Attention' Official MV (Performance ver.)",
+          "path": "assets/songs/newjeans/newjeans_attention_official_mv_performance_ver.mp3",
+          "popularity": 90829956
         }
       ]
     }
