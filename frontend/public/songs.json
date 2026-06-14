@@ -1,0 +1,33 @@
+{
+  "artists": {
+    "NewJeans": {
+      "songs": [
+        {
+          "title": "Super Shy",
+          "path": "public/assets/songs/newjeans/super_shy.mp3",
+          "popularity": 148219207
+        },
+        {
+          "title": "NewJeans 'New Jeans (ft. The Powerpuff Girls)' Lyrics (\ub274\uc9c4\uc2a4 New Jeans \uac00\uc0ac) (Color Coded Lyrics)",
+          "path": "public/assets/songs/newjeans/newjeans_new_jeans_ft_the_powerpuff_girls_lyrics_new_jeans_color_coded_lyrics.mp3",
+          "popularity": 17747605
+        },
+        {
+          "title": "new jeans playlist all songs",
+          "path": "public/assets/songs/newjeans/new_jeans_playlist_all_songs.mp3",
+          "popularity": 5522384
+        },
+        {
+          "title": "[Full Album] New Jeans - \"Get Up\"",
+          "path": "public/assets/songs/newjeans/full_album_new_jeans_get_up.mp3",
+          "popularity": 12571151
+        },
+        {
+          "title": "NewJeans (\ub274\uc9c4\uc2a4) 'New Jeans' Official MV",
+          "path": "public/assets/songs/newjeans/newjeans_new_jeans_official_mv.mp3",
+          "popularity": 42250743
+        }
+      ]
+    }
+  }
+}
