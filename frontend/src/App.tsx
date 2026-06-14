@@ -53,11 +53,13 @@ const SongGuessingApp: React.FC = () => {
     if (!audioRef.current) return;
     
     const audio = audioRef.current;
-    const fullPath = songPath.startsWith('/') 
-      ? `${import.meta.env.BASE_URL}${songPath.substring(1)}` 
-      : songPath;
-      
+    // FIX: Always prepend BASE_URL for GitHub Pages, regardless of starting slash
+    const cleanPath = songPath.startsWith('/') ? songPath.substring(1) : songPath;
+    const fullPath = `${import.meta.env.BASE_URL}${cleanPath}`;
+    
+    console.log("Playing audio from:", fullPath);
     audio.src = fullPath;
+    audio.load(); // Force reload the source
     
     audio.onloadedmetadata = () => {
       const duration = audio.duration;
@@ -65,7 +67,9 @@ const SongGuessingApp: React.FC = () => {
       const startTime = Math.random() * (duration - snippetLen);
       
       audio.currentTime = startTime;
-      audio.play().catch(e => console.error("Playback failed:", e));
+      audio.play()
+        .then(() => console.log("Playback started successfully"))
+        .catch(e => console.error("Playback failed:", e));
       
       setTimeout(() => {
         audio.pause();
@@ -98,10 +102,12 @@ const SongGuessingApp: React.FC = () => {
   };
 
   const handleStartGame = async () => {
-    // UNLOCK AUDIO: Play and pause immediately to satisfy browser autoplay policies
+    // UNLOCK AUDIO: Create a temporary sound to bypass autoplay restrictions
     if (audioRef.current) {
+      audioRef.current.volume = 0;
       audioRef.current.play().then(() => {
         audioRef.current?.pause();
+        if (audioRef.current) audioRef.current.volume = 1;
       }).catch(e => console.log("Initial unlock failed", e));
     }
     
@@ -161,22 +167,15 @@ const SongGuessingApp: React.FC = () => {
 
           <div>
             <label className="block text-sm font-medium mb-2 text-slate-400">Difficulty</label>
-            <div className="flex gap-2">
-              {['Easy', 'Medium', 'Hard'].map(level => (
-                <button
-                  key={level}
-                  type="button"
-                  onClick={() => setDifficulty(level as any)}
-                  className={`flex-1 py-2 rounded-lg transition-all font-semibold ${
-                    difficulty === level 
-                    ? 'bg-purple-600 text-white ring-2 ring-purple-400 shadow-lg shadow-purple-500/30' 
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                  }`}
-                >
-                  {level}
-                </button>
-              ))}
-            </div>
+            <select 
+              className="w-full p-3 rounded-lg bg-slate-700 border border-slate-600 focus:ring-2 focus:ring-purple-500 outline-none"
+              value={difficulty}
+              onChange={(e) => setDifficulty(e.target.value as any)}
+            >
+              <option value="Easy">Easy (10s)</option>
+              <option value="Medium">Medium (5s)</option>
+              <option value="Hard">Hard (2s)</option>
+            </select>
           </div>
 
           <button 
