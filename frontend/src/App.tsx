@@ -18,19 +18,19 @@ const SongGuessingApp: React.FC = () => {
   const [manifest, setManifest] = useState<Manifest | null>(null);
   const [selectedArtist, setSelectedArtist] = useState<string>('');
   const [gameStarted, setGameStarted] = useState(false);
+  const [gameEnded, setGameEnded] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState<{
     target: Song;
     options: Song[];
   } | null>(null);
   const [score, setScore] = useState(0);
-  const [totalQuestions, setTotalQuestions] = useState(0);
+  const [questionCount, setQuestionCount] = useState(0);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [difficulty, setDifficulty] = useState<'Easy' | 'Medium' | 'Hard'>('Medium');
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    // Use import.meta.env.BASE_URL to ensure the path is correct on GitHub Pages
     fetch(`${import.meta.env.BASE_URL}songs.json`)
       .then(res => {
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
@@ -49,12 +49,37 @@ const SongGuessingApp: React.FC = () => {
     }
   };
 
+  const playSnippet = (songPath: string) => {
+    if (!audioRef.current) return;
+    
+    const audio = audioRef.current;
+    const fullPath = songPath.startsWith('/') 
+      ? `${import.meta.env.BASE_URL}${songPath.substring(1)}` 
+      : songPath;
+      
+    audio.src = fullPath;
+    
+    audio.onloadedmetadata = () => {
+      const duration = audio.duration;
+      const snippetLen = getSnippetLength();
+      const startTime = Math.random() * (duration - snippetLen);
+      
+      audio.currentTime = startTime;
+      audio.play().catch(e => console.error("Playback failed:", e));
+      
+      setTimeout(() => {
+        audio.pause();
+      }, snippetLen * 1000);
+    };
+  };
+
   const startNewQuestion = () => {
     if (!manifest || !selectedArtist) return;
 
     const artistSongs = manifest.artists[selectedArtist].songs;
     if (artistSongs.length < 4) {
       alert("Not enough songs for this artist to create a quiz!");
+      setGameStarted(false);
       return;
     }
 
@@ -72,44 +97,39 @@ const SongGuessingApp: React.FC = () => {
     playSnippet(target.path);
   };
 
-  const playSnippet = (songPath: string) => {
-    if (!audioRef.current) return;
+  const handleStartGame = async () => {
+    // UNLOCK AUDIO: Play and pause immediately to satisfy browser autoplay policies
+    if (audioRef.current) {
+      audioRef.current.play().then(() => {
+        audioRef.current?.pause();
+      }).catch(e => console.log("Initial unlock failed", e));
+    }
     
-    const audio = audioRef.current;
-    // Ensure audio paths also use the BASE_URL if they are absolute
-    const fullPath = songPath.startsWith('/') 
-      ? `${import.meta.env.BASE_URL}${songPath.substring(1)}` 
-      : songPath;
-      
-    audio.src = fullPath;
-    
-    audio.onloadedmetadata = () => {
-      const duration = audio.duration;
-      const snippetLen = getSnippetLength();
-      const startTime = Math.random() * (duration - snippetLen);
-      
-      audio.currentTime = startTime;
-      audio.play();
-      
-      setTimeout(() => {
-        audio.pause();
-      }, snippetLen * 1000);
-    };
+    setGameStarted(true);
+    setGameEnded(false);
+    setScore(0);
+    setQuestionCount(0);
+    startNewQuestion();
   };
 
   const handleGuess = (song: Song) => {
     if (!currentQuestion) return;
 
-    if (song.title === currentQuestion.target.title) {
-      setFeedback('correct');
-      setScore(s => s + 1);
-    } else {
-      setFeedback('wrong');
-    }
-    setTotalQuestions(t => t + 1);
+    const isCorrect = song.title === currentQuestion.target.title;
+    setFeedback(isCorrect ? 'correct' : 'wrong');
+    
+    if (isCorrect) setScore(s => s + 1);
+    
+    const newCount = questionCount + 1;
+    setQuestionCount(newCount);
 
     setTimeout(() => {
-      startNewQuestion();
+      if (newCount >= 3) {
+        setGameEnded(true);
+        if (audioRef.current) audioRef.current.pause();
+      } else {
+        startNewQuestion();
+      }
     }, 1500);
   };
 
@@ -145,10 +165,11 @@ const SongGuessingApp: React.FC = () => {
               {['Easy', 'Medium', 'Hard'].map(level => (
                 <button
                   key={level}
+                  type="button"
                   onClick={() => setDifficulty(level as any)}
-                  className={`flex-1 py-2 rounded-lg transition-all ${
+                  className={`flex-1 py-2 rounded-lg transition-all font-semibold ${
                     difficulty === level 
-                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30' 
+                    ? 'bg-purple-600 text-white ring-2 ring-purple-400 shadow-lg shadow-purple-500/30' 
                     : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                   }`}
                 >
@@ -160,17 +181,30 @@ const SongGuessingApp: React.FC = () => {
 
           <button 
             disabled={!selectedArtist}
-            onClick={() => setGameStarted(true)}
+            onClick={handleStartGame}
             className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 font-bold text-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100"
           >
             Start Game
+          </button>
+        </div>
+      ) : gameEnded ? (
+        <div className="bg-slate-800 p-8 rounded-2xl shadow-xl flex flex-col items-center gap-6 w-full max-w-md border border-slate-700 text-center">
+          <div className="text-6xl mb-2">🏆</div>
+          <h2 className="text-3xl font-bold">Quiz Finished!</h2>
+          <p className="text-slate-400 text-lg">You got <span className="text-white font-bold">{score}</span> out of 3 correct!</p>
+          <button 
+            onClick={() => setGameStarted(false)}
+            className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 font-bold text-lg hover:scale-105 transition-transform"
+          >
+            Play Again
           </button>
         </div>
       ) : (
         <div className="w-full max-w-2xl flex flex-col items-center gap-8">
           <div className="flex justify-between w-full text-slate-400 font-medium px-4">
             <span>Artist: {selectedArtist}</span>
-            <span>Score: {score} / {totalQuestions}</span>
+            <span>Question: {questionCount + 1} / 3</span>
+            <span>Score: {score}</span>
           </div>
 
           <div className="relative w-full aspect-video bg-slate-800 rounded-3xl border-4 border-slate-700 flex items-center justify-center overflow-hidden shadow-2xl">
@@ -180,7 +214,7 @@ const SongGuessingApp: React.FC = () => {
             
             <div className="text-center z-10">
               <div className={`text-6xl mb-4 transition-transform duration-300 ${
-                feedback === 'correct' ? 'scale-125' : feedback === 'wrong' ? 'shake' : ''
+                feedback === 'correct' ? 'scale-125' : feedback === 'wrong' ? 'animate-bounce' : ''
               }`}>
                 {feedback === 'correct' ? '✅' : feedback === 'wrong' ? '❌' : '🎵'}
               </div>
@@ -192,8 +226,16 @@ const SongGuessingApp: React.FC = () => {
             {currentQuestion?.options.map((song, i) => (
               <button
                 key={i}
+                type="button"
                 onClick={() => handleGuess(song)}
-                className="p-4 text-lg font-medium rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:border-purple-500 transition-all text-left"
+                disabled={feedback !== null}
+                className={`p-4 text-lg font-medium rounded-xl border transition-all text-left ${
+                  feedback === null 
+                  ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 hover:border-purple-500' 
+                  : song.title === currentQuestion.target.title 
+                    ? 'bg-green-900/40 border-green-500 text-green-200' 
+                    : 'bg-slate-800 border-slate-700 opacity-50'
+                }`}
               >
                 {song.title}
               </button>
@@ -201,11 +243,7 @@ const SongGuessingApp: React.FC = () => {
           </div>
 
           <button 
-            onClick={() => {
-              setGameStarted(false);
-              setScore(0);
-              setTotalQuestions(0);
-            }}
+            onClick={() => setGameStarted(false)}
             className="text-slate-500 hover:text-slate-300 underline underline-offset-4 text-sm transition-colors"
           >
             Quit to Menu
