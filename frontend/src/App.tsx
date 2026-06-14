@@ -30,8 +30,12 @@ const SongGuessingApp: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    fetch('/songs.json')
-      .then(res => res.json())
+    // Use import.meta.env.BASE_URL to ensure the path is correct on GitHub Pages
+    fetch(`${import.meta.env.BASE_URL}songs.json`)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        return res.json();
+      })
       .then(data => setManifest(data))
       .catch(err => console.error("Error loading manifest:", err));
   }, []);
@@ -54,11 +58,9 @@ const SongGuessingApp: React.FC = () => {
       return;
     }
 
-    // 1. Pick a target song
     const targetIndex = Math.floor(Math.random() * artistSongs.length);
     const target = artistSongs[targetIndex];
 
-    // 2. Pick 3 decoys
     const others = artistSongs.filter((_, i) => i !== targetIndex);
     const shuffledOthers = others.sort(() => 0.5 - Math.random()).slice(0, 3);
     
@@ -67,15 +69,19 @@ const SongGuessingApp: React.FC = () => {
     setCurrentQuestion({ target, options });
     setFeedback(null);
     
-    // Play snippet
     playSnippet(target.path);
   };
 
-  const playSnippet = (path: string) => {
+  const playSnippet = (songPath: string) => {
     if (!audioRef.current) return;
     
     const audio = audioRef.current;
-    audio.src = path;
+    // Ensure audio paths also use the BASE_URL if they are absolute
+    const fullPath = songPath.startsWith('/') 
+      ? `${import.meta.env.BASE_URL}${songPath.substring(1)}` 
+      : songPath;
+      
+    audio.src = fullPath;
     
     audio.onloadedmetadata = () => {
       const duration = audio.duration;
@@ -107,7 +113,7 @@ const SongGuessingApp: React.FC = () => {
     }, 1500);
   };
 
-  if (!manifest) return <div className="flex items-center justify-center h-screen">Loading library...</div>;
+  if (!manifest) return <div className="flex items-center justify-center h-screen bg-slate-900 text-white">Loading library...</div>;
 
   return (
     <div className="min-h-screen bg-slate-900 text-white font-sans p-8 flex flex-col items-center">
