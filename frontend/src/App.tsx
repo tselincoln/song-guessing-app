@@ -139,101 +139,109 @@ const SongGuessingApp: React.FC = () => {
     }, 1500);
   };
 
-  if (!manifest) return <div className="flex items-center justify-center h-screen bg-slate-900 text-white">Loading library...</div>;
+  if (!manifest) return <div className="flex items-center justify-center min-h-[100dvh] bg-slate-950 text-white">Loading library...</div>;
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white font-sans p-8 flex flex-col items-center">
+    <div className="min-h-[100dvh] bg-slate-950 text-slate-50 font-sans p-4 sm:p-8 flex flex-col items-center justify-center selection:bg-purple-500/30">
       <audio ref={audioRef} />
       
-      <h1 className="text-4xl font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
+      <h1 className="text-3xl sm:text-4xl font-extrabold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-500 tracking-tight text-center">
         Song Guessing Quiz
       </h1>
 
       {!gameStarted ? (
-        <div className="bg-slate-800 p-8 rounded-2xl shadow-xl flex flex-col gap-6 w-full max-w-md border border-slate-700">
-          <div>
-            <label className="block text-sm font-medium mb-2 text-slate-400">Select Artist</label>
+        <div className="bg-white/5 backdrop-blur-xl p-6 sm:p-8 rounded-[2rem] shadow-2xl flex flex-col gap-6 w-full max-w-md border border-white/10 relative overflow-hidden">
+          {/* Decorative background glow */}
+          <div className="absolute -top-24 -right-24 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="relative z-10">
+            <label className="block text-sm font-medium mb-2 text-slate-300 ml-1">Select Artist</label>
             <select 
-              className="w-full p-3 rounded-lg bg-slate-700 border border-slate-600 focus:ring-2 focus:ring-purple-500 outline-none"
+              className="w-full h-14 px-4 rounded-2xl bg-white/5 border border-white/10 focus:ring-2 focus:ring-violet-500 outline-none text-base appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[length:24px] bg-[position:right_16px_center] bg-no-repeat"
               value={selectedArtist}
               onChange={(e) => setSelectedArtist(e.target.value)}
             >
-              <option value="">-- Choose an Artist --</option>
+              <option value="" className="bg-slate-900">-- Choose an Artist --</option>
               {Object.keys(manifest.artists).map(artist => (
-                <option key={artist} value={artist}>{artist}</option>
+                <option key={artist} value={artist} className="bg-slate-900">{artist}</option>
               ))}
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2 text-slate-400">Difficulty</label>
+          <div className="relative z-10">
+            <label className="block text-sm font-medium mb-2 text-slate-300 ml-1">Difficulty</label>
             <select 
-              className="w-full p-3 rounded-lg bg-slate-700 border border-slate-600 focus:ring-2 focus:ring-purple-500 outline-none"
+              className="w-full h-14 px-4 rounded-2xl bg-white/5 border border-white/10 focus:ring-2 focus:ring-violet-500 outline-none text-base appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[length:24px] bg-[position:right_16px_center] bg-no-repeat"
               value={difficulty}
               onChange={(e) => setDifficulty(e.target.value as any)}
             >
-              <option value="Easy">Easy (10s)</option>
-              <option value="Medium">Medium (5s)</option>
-              <option value="Hard">Hard (2s)</option>
+              <option value="Easy" className="bg-slate-900">Easy (10s)</option>
+              <option value="Medium" className="bg-slate-900">Medium (5s)</option>
+              <option value="Hard" className="bg-slate-900">Hard (2s)</option>
             </select>
           </div>
 
           <button 
             disabled={!selectedArtist}
             onClick={handleStartGame}
-            className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 font-bold text-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100"
+            className="w-full h-14 mt-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 font-bold text-lg active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100 shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_25px_rgba(139,92,246,0.5)] z-10"
           >
             Start Game
           </button>
         </div>
       ) : gameEnded ? (
-        <div className="bg-slate-800 p-8 rounded-2xl shadow-xl flex flex-col items-center gap-6 w-full max-w-md border border-slate-700 text-center">
-          <div className="text-6xl mb-2">🏆</div>
-          <h2 className="text-3xl font-bold">Quiz Finished!</h2>
-          <p className="text-slate-400 text-lg">You got <span className="text-white font-bold">{score}</span> out of 3 correct!</p>
+        <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[2rem] shadow-2xl flex flex-col items-center gap-6 w-full max-w-md border border-white/10 text-center relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-violet-500/10 to-transparent pointer-events-none" />
+          <div className="text-7xl mb-2 drop-shadow-lg z-10">🏆</div>
+          <h2 className="text-3xl font-bold z-10">Quiz Finished!</h2>
+          <p className="text-slate-300 text-lg z-10">You got <span className="text-white font-extrabold text-2xl">{score}</span> out of 3 correct!</p>
           <button 
             onClick={() => setGameStarted(false)}
-            className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 font-bold text-lg hover:scale-105 transition-transform"
+            className="w-full h-14 mt-4 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 font-bold text-lg active:scale-95 transition-all shadow-[0_0_20px_rgba(139,92,246,0.3)] z-10"
           >
             Play Again
           </button>
         </div>
       ) : (
-        <div className="w-full max-w-2xl flex flex-col items-center gap-8">
-          <div className="flex justify-between w-full text-slate-400 font-medium px-4">
-            <span>Artist: {selectedArtist}</span>
-            <span>Question: {questionCount + 1} / 3</span>
-            <span>Score: {score}</span>
+        <div className="w-full max-w-md flex flex-col items-center gap-6">
+          {/* Pill-shaped modern status bar */}
+          <div className="flex justify-between items-center w-full bg-white/5 backdrop-blur-md border border-white/10 rounded-full px-5 py-3 text-sm font-medium text-slate-300 shadow-sm">
+            <span className="truncate max-w-[100px]">{selectedArtist}</span>
+            <span className="bg-white/10 px-3 py-1 rounded-full text-white">{questionCount + 1} / 3</span>
+            <span className="flex items-center gap-1">★ {score}</span>
           </div>
 
-          <div className="relative w-full aspect-video bg-slate-800 rounded-3xl border-4 border-slate-700 flex items-center justify-center overflow-hidden shadow-2xl">
-            <div className={`absolute inset-0 transition-colors duration-300 ${
-              feedback === 'correct' ? 'bg-green-500/20' : feedback === 'wrong' ? 'bg-red-500/20' : ''
+          <div className="relative w-full aspect-square max-h-64 bg-slate-900 rounded-3xl border border-white/10 flex items-center justify-center overflow-hidden shadow-2xl">
+            {/* Animated background rings based on feedback */}
+            <div className={`absolute inset-0 transition-all duration-500 ${
+              feedback === 'correct' ? 'bg-emerald-500/20 opacity-100' : feedback === 'wrong' ? 'bg-rose-500/20 opacity-100' : 'bg-violet-500/5 opacity-50'
             }`} />
             
-            <div className="text-center z-10">
-              <div className={`text-6xl mb-4 transition-transform duration-300 ${
-                feedback === 'correct' ? 'scale-125' : feedback === 'wrong' ? 'animate-bounce' : ''
+            <div className="text-center z-10 flex flex-col items-center">
+              <div className={`text-7xl mb-4 transition-transform duration-500 drop-shadow-xl ${
+              feedback === 'correct' ? 'scale-125' : feedback === 'wrong' ? 'animate-bounce' : 'animate-pulse'
               }`}>
                 {feedback === 'correct' ? '✅' : feedback === 'wrong' ? '❌' : '🎵'}
               </div>
-              <p className="text-slate-400 animate-pulse">Listen closely...</p>
+              <p className="text-slate-300 font-medium tracking-wide">
+                {feedback === null ? 'Listen closely...' : feedback === 'correct' ? 'Correct!' : 'Incorrect'}
+              </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+          <div className="flex flex-col gap-3 w-full mt-2">
             {currentQuestion?.options.map((song, i) => (
               <button
                 key={i}
                 type="button"
                 onClick={() => handleGuess(song)}
                 disabled={feedback !== null}
-                className={`p-4 text-lg font-medium rounded-xl border transition-all text-left ${
+                className={`w-full min-h-[4rem] px-5 py-4 text-base sm:text-lg font-medium rounded-2xl border transition-all active:scale-95 text-left flex items-center ${
                   feedback === null 
-                  ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 hover:border-purple-500' 
-                  : song.title === currentQuestion.target.title 
-                    ? 'bg-green-900/40 border-green-500 text-green-200' 
-                    : 'bg-slate-800 border-slate-700 opacity-50'
+                  ? 'bg-white/5 border-white/10 hover:bg-white/10' 
+                  : song.title === currentQuestion.target.title
+                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-200' 
+                    : 'bg-white/5 border-white/10 opacity-40'
                 }`}
               >
                 {song.title}
@@ -243,7 +251,7 @@ const SongGuessingApp: React.FC = () => {
 
           <button 
             onClick={() => setGameStarted(false)}
-            className="text-slate-500 hover:text-slate-300 underline underline-offset-4 text-sm transition-colors"
+            className="mt-4 text-slate-500 hover:text-slate-300 text-sm font-medium transition-colors active:scale-95 px-6 py-2"
           >
             Quit to Menu
           </button>
