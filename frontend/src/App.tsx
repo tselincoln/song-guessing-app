@@ -26,7 +26,7 @@ const SongGuessingApp: React.FC = () => {
   const [score, setScore] = useState(0);
   const [questionCount, setQuestionCount] = useState(0);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
-  const [difficulty, setDifficulty] = useState<'Easy' | 'Medium' | 'Hard'>('Medium');
+  const [difficulty, setDifficulty] = useState<'Easy' | 'Medium' | 'Hard' | 'Very Hard'>('Medium');
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -44,7 +44,8 @@ const SongGuessingApp: React.FC = () => {
     switch (difficulty) {
       case 'Easy': return 10;
       case 'Medium': return 5;
-      case 'Hard': return 2;
+      case 'Hard': return 1;
+      case 'Very Hard': return 0.5;
       default: return 5;
     }
   };
@@ -130,7 +131,7 @@ const SongGuessingApp: React.FC = () => {
     setQuestionCount(newCount);
 
     setTimeout(() => {
-      if (newCount >= 3) {
+      if (newCount >= 10) {
         setGameEnded(true);
         if (audioRef.current) audioRef.current.pause();
       } else {
@@ -177,7 +178,8 @@ const SongGuessingApp: React.FC = () => {
             >
               <option value="Easy" className="bg-slate-900">Easy (10s)</option>
               <option value="Medium" className="bg-slate-900">Medium (5s)</option>
-              <option value="Hard" className="bg-slate-900">Hard (2s)</option>
+              <option value="Hard" className="bg-slate-900">Hard (1s)</option>
+              <option value="Very Hard" className="bg-slate-900">Very Hard (0.5s)</option>
             </select>
           </div>
 
@@ -194,7 +196,7 @@ const SongGuessingApp: React.FC = () => {
           <div className="absolute inset-0 bg-gradient-to-b from-violet-500/10 to-transparent pointer-events-none" />
           <div className="text-7xl mb-2 drop-shadow-lg z-10">🏆</div>
           <h2 className="text-3xl font-bold z-10">Quiz Finished!</h2>
-          <p className="text-slate-300 text-lg z-10">You got <span className="text-white font-extrabold text-2xl">{score}</span> out of 3 correct!</p>
+          <p className="text-slate-300 text-lg z-10">You got <span className="text-white font-extrabold text-2xl">{score}</span> out of 10 correct!</p>
           <button 
             onClick={() => setGameStarted(false)}
             className="w-full h-14 mt-4 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 font-bold text-lg active:scale-95 transition-all shadow-[0_0_20px_rgba(139,92,246,0.3)] z-10"
@@ -207,7 +209,7 @@ const SongGuessingApp: React.FC = () => {
           {/* Pill-shaped modern status bar */}
           <div className="flex justify-between items-center w-full bg-white/5 backdrop-blur-md border border-white/10 rounded-full px-5 py-3 text-sm font-medium text-slate-300 shadow-sm">
             <span className="truncate max-w-[100px]">{selectedArtist}</span>
-            <span className="bg-white/10 px-3 py-1 rounded-full text-white">{questionCount + 1} / 3</span>
+            <span className="bg-white/10 px-3 py-1 rounded-full text-white">{questionCount + 1} / 10</span>
             <span className="flex items-center gap-1">★ {score}</span>
           </div>
 
