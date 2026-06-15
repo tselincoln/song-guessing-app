@@ -1,7 +1,7 @@
-from admin_tool import get_top_songs, download_song, update_manifest, clean_title
+from admin_tool import get_top_songs, download_song, update_manifest
 
 artist = "NewJeans"
-limit = 10
+limit = 15
 
 print(f"Expanding library to {limit} CLEAN songs for {artist}...")
 top_songs = get_top_songs(artist, limit=limit)
@@ -12,8 +12,8 @@ if not top_songs:
 
 downloaded_songs = []
 for song_info in top_songs:
-    title = song_info.get('title', 'Unknown')
-    clean_t = clean_title(title)
+    # Use the pre-cleaned title generated inside get_top_songs
+    clean_t = song_info.get('cleaned_title', 'Unknown')
     view_count = song_info.get('view_count', 0)
     
     rel_path = download_song(song_info, artist)

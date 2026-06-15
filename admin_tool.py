@@ -2,6 +2,7 @@ import os
 import json
 import subprocess
 import re
+import shutil
 from pathlib import Path
 
 # Configuration
@@ -15,26 +16,61 @@ def slugify(text):
     """Convert text to a filesystem-friendly slug."""
     return re.sub(r'[^a-z0-9]+', '_', text.lower()).strip('_')
 
-def clean_title(title):
-    """Remove YouTube fluff from song titles."""
-    # Patterns to remove
-    patterns = [
-        r'\(Official\s*MV\)', r'\[Official\s*MV\]',
-        r'\(Official\s*Audio\)', r'\[Official\s*Audio\]',
-        r'\(Lyrics\)', r'\[Lyrics\]',
-        r'\(Color\s*Coded\s*Lyrics\)', r'\[Color\s*Coded\s*Lyrics\]',
-        r'\(뉴진스\s*.*?\)', r'\[뉴진스\s*.*?\]',
-        r'\(Official\s*Video\)', r'\[Official\s*Video\]',
-        r'\(Lyric\s*Video\)', r'\[Lyric\s*Video\]',
-        r'\(Topic\)', r'\[Topic\]'
-    ]
+def clean_title(title, artist_name=""):
+    """Remove YouTube fluff and artist name from song titles for a clean display."""
     cleaned = title
-    for p in patterns:
-        cleaned = re.sub(p, '', cleaned, flags=re.IGNORECASE)
     
-    # Remove trailing/leading spaces and weird characters
-    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    # 1. Strip translated artist names often put in brackets
+    cleaned = re.sub(r'\((?:뉴진스|ニュージーンズ)\)', '', cleaned, flags=re.IGNORECASE)
+    
+    # 2. General bracket fluff removal
+    bracket_patterns = [
+        r'[([「【<].*?(?:official|audio|video|mv|lyric|performance|dance|ver\.|part\.|topic).*?[)\]」】>]'
+    ]
+    for p in bracket_patterns:
+        cleaned = re.sub(p, '', cleaned, flags=re.IGNORECASE)
+        
+    # 3. Loose fluff removal (Expanded to catch "Performance Video")
+    loose_fluff = [
+        r'official mv', r'official video', r'official audio', 
+        r'lyrics', r'lyric video', r'music video', r'audio clip',
+        r'performance ver\.?\d*', r'part\.?\d*', r'performance video', 
+        r'performance', r'dance practice', r'special video'
+    ]
+    for fluff in loose_fluff:
+        cleaned = re.sub(rf'(?i)\b{fluff}\b', '', cleaned)
+
+    # 4. Strip the artist name (Made dash/separator optional)
+    if artist_name:
+        artist_pattern = re.escape(artist_name)
+        cleaned = re.sub(rf'(?i)^{artist_pattern}\s*[-:\|]?\s*', '', cleaned)
+        cleaned = re.sub(rf'(?i)\s*[-:\|]?\s*{artist_pattern}$', '', cleaned)
+
+    # 5. Clean up dangling characters, all quotes, and whitespace
+    cleaned = re.sub(r'[\'\"‘’“”「」]', '', cleaned)
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip(" -|:")
+    
     return cleaned
+
+def get_canonical_title(title, artist_name=""):
+    """Generate a highly simplified string for aggressive deduplication."""
+    canonical = title.lower()
+    # Strip features/collaborations
+    canonical = re.split(r'\b(?:ft\.?|feat\.?|featuring)\b', canonical)[0]
+    # Remove all non-alphanumeric characters
+    canonical = re.sub(r'[^a-z0-9]', '', canonical)
+    
+    # FINAL SAFETY NET: Strip the artist name completely from the canonical ID
+    if artist_name:
+        artist_canonical = re.sub(r'[^a-z0-9]', '', artist_name.lower())
+        if artist_canonical:
+            # Only remove if it doesn't leave the string entirely empty
+            # (e.g. if the song is literally named after the artist)
+            temp = canonical.replace(artist_canonical, '')
+            if temp != "":
+                canonical = temp
+                
+    return canonical
 
 def is_playlist(title):
     """Detect if a result is likely a playlist or album."""
@@ -42,11 +78,10 @@ def is_playlist(title):
     return any(word in title.lower() for word in blacklist)
 
 def get_top_songs(artist_name, limit=10):
-    """Search YouTube for the top songs of an artist using yt-dlp."""
-    print(f"Searching for clean songs by {artist_name}...")
+    """Search YouTube for the top songs of an artist using yt-dlp, ensuring uniqueness."""
+    print(f"Searching for unique clean songs by {artist_name}...")
     
-    # specifically search for "official audio" to avoid playlists
-    search_query = f"ytsearch{limit * 2}:{artist_name} official audio"
+    search_query = f"ytsearch{limit * 5}:{artist_name} official audio"
     cmd = [
         "yt-dlp",
         "--dump-json",
@@ -58,12 +93,24 @@ def get_top_songs(artist_name, limit=10):
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         lines = result.stdout.strip().split('\n')
         songs_data = []
+        seen_canonical_titles = set()
+        
         for line in lines:
             if line:
                 data = json.loads(line)
-                title = data.get('title', '')
-                if not is_playlist(title):
+                raw_title = data.get('title', '')
+                
+                # Clean the display title
+                display_title = clean_title(raw_title, artist_name)
+                # Generate strict canonical ID
+                canonical = get_canonical_title(display_title, artist_name)
+                
+                if not is_playlist(raw_title) and canonical not in seen_canonical_titles and canonical != "":
+                    # Store the cleaned title so we don't have to clean it again
+                    data['cleaned_title'] = display_title 
                     songs_data.append(data)
+                    seen_canonical_titles.add(canonical)
+                
                 if len(songs_data) >= limit:
                     break
         return songs_data
@@ -73,8 +120,7 @@ def get_top_songs(artist_name, limit=10):
 
 def download_song(song_info, artist_name):
     """Download the audio of a song and convert to MP3."""
-    raw_title = song_info.get('title', 'Unknown Song')
-    song_title = clean_title(raw_title)
+    song_title = song_info.get('cleaned_title', 'Unknown Song')
     video_url = f"https://www.youtube.com/watch?v={song_info.get('id')}"
     
     artist_slug = slugify(artist_name)
@@ -111,7 +157,6 @@ def download_song(song_info, artist_name):
         # Move to both locations
         for p in paths:
             dest = p / filename
-            import shutil
             shutil.copy(actual_file, dest)
             
         # Clean up temp
@@ -160,7 +205,7 @@ def main():
             
         downloaded_songs = []
         for song_info in top_songs:
-            title = clean_title(song_info.get('title', 'Unknown'))
+            title = song_info.get('cleaned_title', 'Unknown')
             view_count = song_info.get('view_count', 0)
             
             rel_path = download_song(song_info, artist_name)
