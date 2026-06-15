@@ -51,7 +51,7 @@ const SongGuessingApp: React.FC = () => {
     }
   };
 
-  const playSnippet = (songPath: string) => {
+  const playSnippet = (songPath: string, durationOverride?: number) => {
     if (!audioRef.current) return;
     const audio = audioRef.current;
     
@@ -74,7 +74,7 @@ const SongGuessingApp: React.FC = () => {
     
     audio.onloadedmetadata = () => {
       const duration = audio.duration;
-      const snippetLen = getSnippetLength();
+      const snippetLen = durationOverride !== undefined ? durationOverride : getSnippetLength();
       const safeDuration = Math.max(0, duration - snippetLen);
       
       // 3. Force a minimum of 0.001s to ensure the 'seeked' event ALWAYS fires
@@ -90,9 +90,10 @@ const SongGuessingApp: React.FC = () => {
             audio.volume = 1; // Unmute
             console.log("Playback and seek successful");
             
+            const finalLen = durationOverride !== undefined ? durationOverride : getSnippetLength();
             playbackTimerRef.current = setTimeout(() => {
               audio.pause();
-            }, getSnippetLength() * 1000);
+            }, finalLen * 1000);
           })
           .catch(e => console.error("Playback failed:", e));
       }
@@ -144,6 +145,9 @@ const SongGuessingApp: React.FC = () => {
     const newCount = questionCount + 1;
     setQuestionCount(newCount);
 
+    // Play the correct answer for 5 seconds as a reveal
+    playSnippet(currentQuestion.target.path, 5);
+
     setTimeout(() => {
       if (newCount >= 10) {
         setGameEnded(true);
@@ -152,7 +156,7 @@ const SongGuessingApp: React.FC = () => {
       } else {
         startNewQuestion();
       }
-    }, 1500);
+    }, 6000); // Increased to 6s to allow the 5s reveal to play fully
   };
 
   useEffect(() => {
