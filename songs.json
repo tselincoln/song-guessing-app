@@ -76,6 +76,41 @@
           "title": "OMG",
           "path": "assets/songs/newjeans/omg.mp3",
           "popularity": 401953590
+        },
+        {
+          "title": "Zero",
+          "path": "assets/songs/newjeans/zero.mp3",
+          "popularity": 76289
+        },
+        {
+          "title": "Be Who You Are",
+          "path": "assets/songs/newjeans/be_who_you_are.mp3",
+          "popularity": 267577
+        },
+        {
+          "title": "Beautiful Restriction",
+          "path": "assets/songs/newjeans/beautiful_restriction.mp3",
+          "popularity": 153007
+        },
+        {
+          "title": "Gods",
+          "path": "assets/songs/newjeans/gods.mp3",
+          "popularity": 442698
+        },
+        {
+          "title": "Our Night Is More Beautiful Than Your Day",
+          "path": "assets/songs/newjeans/our_night_is_more_beautiful_than_your_day.mp3",
+          "popularity": 295895
+        },
+        {
+          "title": "Bubble Gum",
+          "path": "assets/songs/newjeans/bubble_gum.mp3",
+          "popularity": 203283
+        },
+        {
+          "title": "Pit Stop",
+          "path": "assets/songs/newjeans/pit_stop.mp3",
+          "popularity": 506411
         }
       ]
     }

@@ -167,8 +167,8 @@ def download_song(song_info, artist_name):
         print(f"Failed to download {song_title}: {e}")
         return None
 
-def update_manifest(artist_name, song_details):
-    """Update the songs.json manifest file."""
+def update_manifest(artist_name, song_details, append=False):
+    """Update the songs.json manifest file. If append=True, adds to existing list instead of replacing."""
     manifests = [MANIFEST_PATH, FRONTEND_MANIFEST_PATH]
     
     for path in manifests:
@@ -182,8 +182,15 @@ def update_manifest(artist_name, song_details):
         if artist_name not in data["artists"]:
             data["artists"][artist_name] = {"songs": []}
         
-        # Clear existing songs for this artist to avoid mixing old messy ones
-        data["artists"][artist_name]["songs"] = song_details
+        if append:
+            # Only add songs that aren't already in the list (by title)
+            existing_titles = {s['title'] for s in data["artists"][artist_name]["songs"]}
+            for s in song_details:
+                if s['title'] not in existing_titles:
+                    data["artists"][artist_name]["songs"].append(s)
+        else:
+            # Clear existing songs for this artist to avoid mixing old messy ones
+            data["artists"][artist_name]["songs"] = song_details
         
         with open(path, 'w') as f:
             json.dump(data, f, indent=2)
