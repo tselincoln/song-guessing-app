@@ -29,7 +29,6 @@ const SongGuessingApp: React.FC = () => {
   const [difficulty, setDifficulty] = useState<'Easy' | 'Medium' | 'Hard' | 'Very Hard'>('Medium');
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  // NEW: Ref to track the pause timer so we can cancel it if a new song starts
   const playbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -54,41 +53,49 @@ const SongGuessingApp: React.FC = () => {
 
   const playSnippet = (songPath: string) => {
     if (!audioRef.current) return;
-    
     const audio = audioRef.current;
     
-    // NEW: Clear any existing timers from previous questions
+    // Clear old timers and listeners
     if (playbackTimerRef.current) {
       clearTimeout(playbackTimerRef.current);
     }
+    audio.onloadedmetadata = null;
+    audio.onseeked = null;
 
     const cleanPath = songPath.startsWith('/') ? songPath.substring(1) : songPath;
     const fullPath = `${import.meta.env.BASE_URL}${cleanPath}`;
     
-    console.log("Playing audio from:", fullPath);
+    // 1. Mute immediately to prevent hearing the start of the track
+    audio.volume = 0;
     audio.src = fullPath;
-    audio.load(); // Force reload the source
+    
+    // 2. Call play() SYNCHRONOUSLY to satisfy strict browser autoplay policies
+    const playPromise = audio.play();
     
     audio.onloadedmetadata = () => {
       const duration = audio.duration;
       const snippetLen = getSnippetLength();
-      
-      // Ensure we don't pick a start time too close to the end
       const safeDuration = Math.max(0, duration - snippetLen);
-      const startTime = Math.random() * safeDuration;
       
+      // 3. Force a minimum of 0.001s to ensure the 'seeked' event ALWAYS fires
+      const startTime = Math.max(0.001, Math.random() * safeDuration);
       audio.currentTime = startTime;
-      
-      // FIX: Wait for playback to actually start before starting the pause countdown
-      audio.play()
-        .then(() => {
-          console.log("Playback started successfully");
-          
-          playbackTimerRef.current = setTimeout(() => {
-            audio.pause();
-          }, snippetLen * 1000);
-        })
-        .catch(e => console.error("Playback failed:", e));
+    };
+
+    audio.onseeked = () => {
+      // 4. 'seeked' means the browser successfully jumped to the random timestamp and buffered
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            audio.volume = 1; // Unmute
+            console.log("Playback and seek successful");
+            
+            playbackTimerRef.current = setTimeout(() => {
+              audio.pause();
+            }, getSnippetLength() * 1000);
+          })
+          .catch(e => console.error("Playback failed:", e));
+      }
     };
   };
 
@@ -116,15 +123,9 @@ const SongGuessingApp: React.FC = () => {
     playSnippet(target.path);
   };
 
-  const handleStartGame = async () => {
-    if (audioRef.current) {
-      audioRef.current.volume = 0;
-      audioRef.current.play().then(() => {
-        audioRef.current?.pause();
-        if (audioRef.current) audioRef.current.volume = 1;
-      }).catch(e => console.log("Initial unlock failed", e));
-    }
-    
+  const handleStartGame = () => {
+    // We completely removed the hacky unlock promise block here. 
+    // The synchronous play() inside playSnippet handles it cleanly now.
     setGameStarted(true);
     setGameEnded(false);
     setScore(0);
@@ -147,7 +148,6 @@ const SongGuessingApp: React.FC = () => {
       if (newCount >= 10) {
         setGameEnded(true);
         if (audioRef.current) audioRef.current.pause();
-        // Clear timer on game end
         if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
       } else {
         startNewQuestion();
@@ -155,7 +155,6 @@ const SongGuessingApp: React.FC = () => {
     }, 1500);
   };
 
-  // Clean up timer on unmount
   useEffect(() => {
     return () => {
       if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
