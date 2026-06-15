@@ -29,6 +29,8 @@ const SongGuessingApp: React.FC = () => {
   const [difficulty, setDifficulty] = useState<'Easy' | 'Medium' | 'Hard' | 'Very Hard'>('Medium');
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // NEW: Ref to track the pause timer so we can cancel it if a new song starts
+  const playbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}songs.json`)
@@ -54,7 +56,12 @@ const SongGuessingApp: React.FC = () => {
     if (!audioRef.current) return;
     
     const audio = audioRef.current;
-    // FIX: Always prepend BASE_URL for GitHub Pages, regardless of starting slash
+    
+    // NEW: Clear any existing timers from previous questions
+    if (playbackTimerRef.current) {
+      clearTimeout(playbackTimerRef.current);
+    }
+
     const cleanPath = songPath.startsWith('/') ? songPath.substring(1) : songPath;
     const fullPath = `${import.meta.env.BASE_URL}${cleanPath}`;
     
@@ -65,16 +72,23 @@ const SongGuessingApp: React.FC = () => {
     audio.onloadedmetadata = () => {
       const duration = audio.duration;
       const snippetLen = getSnippetLength();
-      const startTime = Math.random() * (duration - snippetLen);
+      
+      // Ensure we don't pick a start time too close to the end
+      const safeDuration = Math.max(0, duration - snippetLen);
+      const startTime = Math.random() * safeDuration;
       
       audio.currentTime = startTime;
-      audio.play()
-        .then(() => console.log("Playback started successfully"))
-        .catch(e => console.error("Playback failed:", e));
       
-      setTimeout(() => {
-        audio.pause();
-      }, snippetLen * 1000);
+      // FIX: Wait for playback to actually start before starting the pause countdown
+      audio.play()
+        .then(() => {
+          console.log("Playback started successfully");
+          
+          playbackTimerRef.current = setTimeout(() => {
+            audio.pause();
+          }, snippetLen * 1000);
+        })
+        .catch(e => console.error("Playback failed:", e));
     };
   };
 
@@ -103,7 +117,6 @@ const SongGuessingApp: React.FC = () => {
   };
 
   const handleStartGame = async () => {
-    // UNLOCK AUDIO: Create a temporary sound to bypass autoplay restrictions
     if (audioRef.current) {
       audioRef.current.volume = 0;
       audioRef.current.play().then(() => {
@@ -134,11 +147,20 @@ const SongGuessingApp: React.FC = () => {
       if (newCount >= 10) {
         setGameEnded(true);
         if (audioRef.current) audioRef.current.pause();
+        // Clear timer on game end
+        if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
       } else {
         startNewQuestion();
       }
     }, 1500);
   };
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
+    };
+  }, []);
 
   if (!manifest) return <div className="flex items-center justify-center min-h-[100dvh] bg-slate-950 text-white">Loading library...</div>;
 
@@ -152,7 +174,6 @@ const SongGuessingApp: React.FC = () => {
 
       {!gameStarted ? (
         <div className="bg-white/5 backdrop-blur-xl p-6 sm:p-8 rounded-[2rem] shadow-2xl flex flex-col gap-6 w-full max-w-md border border-white/10 relative overflow-hidden">
-          {/* Decorative background glow */}
           <div className="absolute -top-24 -right-24 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
           
           <div className="relative z-10">
@@ -206,7 +227,6 @@ const SongGuessingApp: React.FC = () => {
         </div>
       ) : (
         <div className="w-full max-w-md flex flex-col items-center gap-6">
-          {/* Pill-shaped modern status bar */}
           <div className="flex justify-between items-center w-full bg-white/5 backdrop-blur-md border border-white/10 rounded-full px-5 py-3 text-sm font-medium text-slate-300 shadow-sm">
             <span className="truncate max-w-[100px]">{selectedArtist}</span>
             <span className="bg-white/10 px-3 py-1 rounded-full text-white">{questionCount + 1} / 10</span>
@@ -214,7 +234,6 @@ const SongGuessingApp: React.FC = () => {
           </div>
 
           <div className="relative w-full aspect-square max-h-64 bg-slate-900 rounded-3xl border border-white/10 flex items-center justify-center overflow-hidden shadow-2xl">
-            {/* Animated background rings based on feedback */}
             <div className={`absolute inset-0 transition-all duration-500 ${
               feedback === 'correct' ? 'bg-emerald-500/20 opacity-100' : feedback === 'wrong' ? 'bg-rose-500/20 opacity-100' : 'bg-violet-500/5 opacity-50'
             }`} />
