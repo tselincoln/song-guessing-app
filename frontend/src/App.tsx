@@ -19,10 +19,7 @@ const SongGuessingApp: React.FC = () => {
   const [selectedArtist, setSelectedArtist] = useState<string>('');
   const [gameStarted, setGameStarted] = useState(false);
   const [gameEnded, setGameEnded] = useState(false);
-  const [currentQuestion, setCurrentQuestion] = useState<{
-    target: Song;
-    options: Song[];
-  } | null>(null);
+  const [currentQuestion, setCurrentQuestion] = useState<{\n    target: Song;\n    options: Song[];\n    startTime: number;\n  } | null>(null);
   const [score, setScore] = useState(0);
   const [questionCount, setQuestionCount] = useState(0);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
@@ -52,7 +49,7 @@ const SongGuessingApp: React.FC = () => {
     }
   };
 
-  const playSnippet = (songPath: string, durationOverride?: number) => {
+  const playSnippet = (songPath: string, durationOverride?: number, startTimeOverride?: number) => {
     if (!audioRef.current) return;
     const audio = audioRef.current;
     
@@ -78,9 +75,17 @@ const SongGuessingApp: React.FC = () => {
       const snippetLen = durationOverride !== undefined ? durationOverride : getSnippetLength();
       const safeDuration = Math.max(0, duration - snippetLen);
       
-      // 3. Force a minimum of 0.001s to ensure the 'seeked' event ALWAYS fires
-      const startTime = Math.max(0.001, Math.random() * safeDuration);
+      // 3. Use provided startTime or generate a random one
+      const startTime = startTimeOverride !== undefined 
+        ? startTimeOverride 
+        : Math.max(0.001, Math.random() * safeDuration);
+        
       audio.currentTime = startTime;
+
+      // Persist the start time so Replay can use the exact same snippet
+      if (startTimeOverride === undefined) {
+        setCurrentQuestion(prev => prev ? { ...prev, startTime } : null);
+      }
     };
 
     audio.onseeked = () => {
@@ -119,7 +124,16 @@ const SongGuessingApp: React.FC = () => {
     
     const options = [target, ...shuffledOthers].sort(() => 0.5 - Math.random());
 
-    setCurrentQuestion({ target, options });
+    // We'll generate the startTime inside playSnippet on first call, 
+    // but for the Replay to work, we need to persist it.
+    // Since we don't know the actual duration until loadedmetadata, 
+    // we'll let playSnippet return it or store it after the first seek.
+    
+    setCurrentQuestion({ 
+      target, 
+      options, 
+      startTime: 0 // placeholder, will be updated by playSnippet
+    });
     setFeedback(null);
     
     playSnippet(target.path);
@@ -261,9 +275,17 @@ const SongGuessingApp: React.FC = () => {
             disabled={!currentQuestion}
             onClick={() => {
               if (feedback) {
+                // Clear any pending auto-next timers before jumping
+                if (nextQuestionTimerRef.current) {
+                  clearTimeout(nextQuestionTimerRef.current);
+                }
                 startNewQuestion();
               } else {
-                playSnippet(currentQuestion.target.path);
+                playSnippet(
+                  currentQuestion.target.path, 
+                  undefined, 
+                  currentQuestion.startTime
+                );
               }
             }}
             className="flex items-center justify-center gap-2 w-full h-12 rounded-2xl bg-white/5 border border-white/10 text-slate-300 font-medium transition-all active:scale-95 disabled:opacity-30 hover:bg-white/10"
