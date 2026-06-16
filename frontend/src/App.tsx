@@ -22,17 +22,17 @@ const SongGuessingApp: React.FC = () => {
   const [currentQuestion, setCurrentQuestion] = useState<{
     target: Song;
     options: Song[];
-    startTime: number;
   } | null>(null);
   const [score, setScore] = useState(0);
   const [questionCount, setQuestionCount] = useState(0);
-
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [difficulty, setDifficulty] = useState<'Easy' | 'Medium' | 'Hard' | 'Very Hard'>('Medium');
-  
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playbackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const nextQuestionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // ✅ FIX: Store startTime in a ref so it's always current, no stale closure issues
+  const snippetStartTimeRef = useRef<number>(0);
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}songs.json`)
@@ -57,8 +57,7 @@ const SongGuessingApp: React.FC = () => {
   const playSnippet = (songPath: string, durationOverride?: number, startTimeOverride?: number) => {
     if (!audioRef.current) return;
     const audio = audioRef.current;
-    
-    // Clear old timers and listeners
+
     if (playbackTimerRef.current) {
       clearTimeout(playbackTimerRef.current);
     }
@@ -67,40 +66,40 @@ const SongGuessingApp: React.FC = () => {
 
     const cleanPath = songPath.startsWith('/') ? songPath.substring(1) : songPath;
     const fullPath = `${import.meta.env.BASE_URL}${cleanPath}`;
-    
-    // 1. Mute immediately to prevent hearing the start of the track
+
     audio.volume = 0;
-    audio.src = fullPath;
-    
-    // 2. Call play() SYNCHRONOUSLY to satisfy strict browser autoplay policies
+
+    // ✅ FIX: Only update src if it actually changed, to avoid reloading the same file on Replay
+    if (audio.src !== fullPath) {
+      audio.src = fullPath;
+    }
+
     const playPromise = audio.play();
-    
+
     audio.onloadedmetadata = () => {
       const duration = audio.duration;
       const snippetLen = durationOverride !== undefined ? durationOverride : getSnippetLength();
       const safeDuration = Math.max(0, duration - snippetLen);
-      
-      // 3. Use provided startTime or generate a random one
-      const startTime = startTimeOverride !== undefined 
-        ? startTimeOverride 
-        : Math.max(0.001, Math.random() * safeDuration);
-        
-      audio.currentTime = startTime;
 
-      // Persist the start time so Replay can use the exact same snippet
-      if (startTimeOverride === undefined) {
-        setCurrentQuestion(prev => prev ? { ...prev, startTime } : null);
+      let startTime: number;
+      if (startTimeOverride !== undefined) {
+        // Replay: use the exact same start time stored in the ref
+        startTime = startTimeOverride;
+      } else {
+        // New question: generate a random start time and persist it in the ref
+        startTime = Math.max(0.001, Math.random() * safeDuration);
+        // ✅ FIX: Store in ref immediately — synchronous, no render cycle needed
+        snippetStartTimeRef.current = startTime;
       }
+
+      audio.currentTime = startTime;
     };
 
     audio.onseeked = () => {
-      // 4. 'seeked' means the browser successfully jumped to the random timestamp and buffered
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            audio.volume = 1; // Unmute
-            console.log("Playback and seek successful");
-            
+            audio.volume = 1;
             const finalLen = durationOverride !== undefined ? durationOverride : getSnippetLength();
             playbackTimerRef.current = setTimeout(() => {
               audio.pause();
@@ -126,27 +125,19 @@ const SongGuessingApp: React.FC = () => {
 
     const others = artistSongs.filter((_, i) => i !== targetIndex);
     const shuffledOthers = others.sort(() => 0.5 - Math.random()).slice(0, 3);
-    
     const options = [target, ...shuffledOthers].sort(() => 0.5 - Math.random());
 
-    // We'll generate the startTime inside playSnippet on first call, 
-    // but for the Replay to work, we need to persist it.
-    // Since we don't know the actual duration until loadedmetadata, 
-    // we'll let playSnippet return it or store it after the first seek.
-    
-    setCurrentQuestion({ 
-      target, 
-      options, 
-      startTime: 0 // placeholder, will be updated by playSnippet
-    });
+    // ✅ FIX: Reset the ref when starting a new question
+    snippetStartTimeRef.current = 0;
+
+    // ✅ FIX: Removed startTime from state — it now lives exclusively in the ref
+    setCurrentQuestion({ target, options });
     setFeedback(null);
-    
+
     playSnippet(target.path);
   };
 
   const handleStartGame = () => {
-    // We completely removed the hacky unlock promise block here. 
-    // The synchronous play() inside playSnippet handles it cleanly now.
     setGameStarted(true);
     setGameEnded(false);
     setScore(0);
@@ -159,13 +150,12 @@ const SongGuessingApp: React.FC = () => {
 
     const isCorrect = song.title === currentQuestion.target.title;
     setFeedback(isCorrect ? 'correct' : 'wrong');
-    
+
     if (isCorrect) setScore(s => s + 1);
-    
+
     const newCount = questionCount + 1;
     setQuestionCount(newCount);
 
-    // Play the correct answer for 5 seconds as a reveal
     playSnippet(currentQuestion.target.path, 5);
 
     setTimeout(() => {
@@ -178,7 +168,7 @@ const SongGuessingApp: React.FC = () => {
           startNewQuestion();
         }, 6000);
       }
-    }, 6000); // Increased to 6s to allow the 5s reveal to play fully
+    }, 6000);
   };
 
   useEffect(() => {
@@ -193,7 +183,7 @@ const SongGuessingApp: React.FC = () => {
   return (
     <div className="min-h-[100dvh] bg-slate-950 text-slate-50 font-sans p-4 sm:p-8 flex flex-col items-center justify-center selection:bg-purple-500/30">
       <audio ref={audioRef} />
-      
+
       <h1 className="text-3xl sm:text-4xl font-extrabold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-500 tracking-tight text-center">
         Song Guessing Quiz
       </h1>
@@ -201,10 +191,10 @@ const SongGuessingApp: React.FC = () => {
       {!gameStarted ? (
         <div className="bg-white/5 backdrop-blur-xl p-6 sm:p-8 rounded-[2rem] shadow-2xl flex flex-col gap-6 w-full max-w-md border border-white/10 relative overflow-hidden">
           <div className="absolute -top-24 -right-24 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
-          
+
           <div className="relative z-10">
             <label className="block text-sm font-medium mb-2 text-slate-300 ml-1">Select Artist</label>
-            <select 
+            <select
               className="w-full h-14 px-4 rounded-2xl bg-white/5 border border-white/10 focus:ring-2 focus:ring-violet-500 outline-none text-base appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[length:24px] bg-[position:right_16px_center] bg-no-repeat"
               value={selectedArtist}
               onChange={(e) => setSelectedArtist(e.target.value)}
@@ -218,7 +208,7 @@ const SongGuessingApp: React.FC = () => {
 
           <div className="relative z-10">
             <label className="block text-sm font-medium mb-2 text-slate-300 ml-1">Difficulty</label>
-            <select 
+            <select
               className="w-full h-14 px-4 rounded-2xl bg-white/5 border border-white/10 focus:ring-2 focus:ring-violet-500 outline-none text-base appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[length:24px] bg-[position:right_16px_center] bg-no-repeat"
               value={difficulty}
               onChange={(e) => setDifficulty(e.target.value as any)}
@@ -230,7 +220,7 @@ const SongGuessingApp: React.FC = () => {
             </select>
           </div>
 
-          <button 
+          <button
             disabled={!selectedArtist}
             onClick={handleStartGame}
             className="w-full h-14 mt-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 font-bold text-lg active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100 shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_25px_rgba(139,92,246,0.5)] z-10"
@@ -244,7 +234,7 @@ const SongGuessingApp: React.FC = () => {
           <div className="text-7xl mb-2 drop-shadow-lg z-10">🏆</div>
           <h2 className="text-3xl font-bold z-10">Quiz Finished!</h2>
           <p className="text-slate-300 text-lg z-10">You got <span className="text-white font-extrabold text-2xl">{score}</span> out of 10 correct!</p>
-          <button 
+          <button
             onClick={() => setGameStarted(false)}
             className="w-full h-14 mt-4 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 font-bold text-lg active:scale-95 transition-all shadow-[0_0_20px_rgba(139,92,246,0.3)] z-10"
           >
@@ -263,10 +253,9 @@ const SongGuessingApp: React.FC = () => {
             <div className={`absolute inset-0 transition-all duration-500 ${
               feedback === 'correct' ? 'bg-emerald-500/20 opacity-100' : feedback === 'wrong' ? 'bg-rose-500/20 opacity-100' : 'bg-violet-500/5 opacity-50'
             }`} />
-            
             <div className="text-center z-10 flex flex-col items-center">
               <div className={`text-7xl mb-4 transition-transform duration-500 drop-shadow-xl ${
-              feedback === 'correct' ? 'scale-125' : feedback === 'wrong' ? 'animate-bounce' : 'animate-pulse'
+                feedback === 'correct' ? 'scale-125' : feedback === 'wrong' ? 'animate-bounce' : 'animate-pulse'
               }`}>
                 {feedback === 'correct' ? '✅' : feedback === 'wrong' ? '❌' : '🎵'}
               </div>
@@ -276,20 +265,20 @@ const SongGuessingApp: React.FC = () => {
             </div>
           </div>
 
-          <button 
+          <button
             disabled={!currentQuestion}
             onClick={() => {
               if (feedback) {
-                // Clear any pending auto-next timers before jumping
                 if (nextQuestionTimerRef.current) {
                   clearTimeout(nextQuestionTimerRef.current);
                 }
                 startNewQuestion();
               } else {
+                // ✅ FIX: Read startTime from the ref, not from state
                 playSnippet(
-                  currentQuestion.target.path, 
-                  undefined, 
-                  currentQuestion.startTime
+                  currentQuestion!.target.path,
+                  undefined,
+                  snippetStartTimeRef.current
                 );
               }
             }}
@@ -306,11 +295,11 @@ const SongGuessingApp: React.FC = () => {
                 onClick={() => handleGuess(song)}
                 disabled={feedback !== null}
                 className={`w-full min-h-[4rem] px-5 py-4 text-base sm:text-lg font-medium rounded-2xl border transition-all active:scale-95 text-left flex items-center ${
-                  feedback === null 
-                  ? 'bg-white/5 border-white/10 hover:bg-white/10' 
-                  : song.title === currentQuestion.target.title
-                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-200' 
-                    : 'bg-white/5 border-white/10 opacity-40'
+                  feedback === null
+                    ? 'bg-white/5 border-white/10 hover:bg-white/10'
+                    : song.title === currentQuestion.target.title
+                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-200'
+                      : 'bg-white/5 border-white/10 opacity-40'
                 }`}
               >
                 {song.title}
@@ -318,7 +307,7 @@ const SongGuessingApp: React.FC = () => {
             ))}
           </div>
 
-          <button 
+          <button
             onClick={() => setGameStarted(false)}
             className="mt-4 text-slate-500 hover:text-slate-300 text-sm font-medium transition-colors active:scale-95 px-6 py-2"
           >
