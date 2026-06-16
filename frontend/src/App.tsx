@@ -31,7 +31,8 @@ const SongGuessingApp: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playbackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const nextQuestionTimerRef = useRef<NodeJS.Timeout | null>(null);
-  // ✅ FIX: Store startTime in a ref so it's always current, no stale closure issues
+  // ✅ Store the reveal-delay timer separately so it can be cancelled on early skip
+  const revealDelayTimerRef = useRef<NodeJS.Timeout | null>(null);
   const snippetStartTimeRef = useRef<number>(0);
 
   useEffect(() => {
@@ -69,7 +70,6 @@ const SongGuessingApp: React.FC = () => {
 
     audio.volume = 0;
 
-    // ✅ FIX: Only update src if it actually changed, to avoid reloading the same file on Replay
     if (audio.src !== fullPath) {
       audio.src = fullPath;
     }
@@ -83,12 +83,9 @@ const SongGuessingApp: React.FC = () => {
 
       let startTime: number;
       if (startTimeOverride !== undefined) {
-        // Replay: use the exact same start time stored in the ref
         startTime = startTimeOverride;
       } else {
-        // New question: generate a random start time and persist it in the ref
         startTime = Math.max(0.001, Math.random() * safeDuration);
-        // ✅ FIX: Store in ref immediately — synchronous, no render cycle needed
         snippetStartTimeRef.current = startTime;
       }
 
@@ -110,6 +107,22 @@ const SongGuessingApp: React.FC = () => {
     };
   };
 
+  // ✅ Central cleanup: cancel ALL pending timers and stop audio
+  const cancelAllTimers = () => {
+    if (playbackTimerRef.current) {
+      clearTimeout(playbackTimerRef.current);
+      playbackTimerRef.current = null;
+    }
+    if (revealDelayTimerRef.current) {
+      clearTimeout(revealDelayTimerRef.current);
+      revealDelayTimerRef.current = null;
+    }
+    if (nextQuestionTimerRef.current) {
+      clearTimeout(nextQuestionTimerRef.current);
+      nextQuestionTimerRef.current = null;
+    }
+  };
+
   const startNewQuestion = () => {
     if (!manifest || !selectedArtist) return;
 
@@ -127,10 +140,7 @@ const SongGuessingApp: React.FC = () => {
     const shuffledOthers = others.sort(() => 0.5 - Math.random()).slice(0, 3);
     const options = [target, ...shuffledOthers].sort(() => 0.5 - Math.random());
 
-    // ✅ FIX: Reset the ref when starting a new question
     snippetStartTimeRef.current = 0;
-
-    // ✅ FIX: Removed startTime from state — it now lives exclusively in the ref
     setCurrentQuestion({ target, options });
     setFeedback(null);
 
@@ -156,13 +166,15 @@ const SongGuessingApp: React.FC = () => {
     const newCount = questionCount + 1;
     setQuestionCount(newCount);
 
-    playSnippet(currentQuestion.target.path, 5);
+    // ✅ FIX 1: Reveal plays from the SAME start time as the original snippet
+    playSnippet(currentQuestion.target.path, 5, snippetStartTimeRef.current);
 
-    setTimeout(() => {
+    // ✅ FIX 2: Store this timer in a ref so early-skip can cancel it
+    revealDelayTimerRef.current = setTimeout(() => {
       if (newCount >= 10) {
         setGameEnded(true);
         if (audioRef.current) audioRef.current.pause();
-        if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
+        cancelAllTimers();
       } else {
         nextQuestionTimerRef.current = setTimeout(() => {
           startNewQuestion();
@@ -172,13 +184,14 @@ const SongGuessingApp: React.FC = () => {
   };
 
   useEffect(() => {
-    return () => {
-      if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
-      if (nextQuestionTimerRef.current) clearTimeout(nextQuestionTimerRef.current);
-    };
+    return () => cancelAllTimers();
   }, []);
 
-  if (!manifest) return <div className="flex items-center justify-center min-h-[100dvh] bg-slate-950 text-white">Loading library...</div>;
+  if (!manifest) return (
+    <div className="flex items-center justify-center min-h-[100dvh] bg-slate-950 text-white">
+      Loading library...
+    </div>
+  );
 
   return (
     <div className="min-h-[100dvh] bg-slate-950 text-slate-50 font-sans p-4 sm:p-8 flex flex-col items-center justify-center selection:bg-purple-500/30">
@@ -233,7 +246,9 @@ const SongGuessingApp: React.FC = () => {
           <div className="absolute inset-0 bg-gradient-to-b from-violet-500/10 to-transparent pointer-events-none" />
           <div className="text-7xl mb-2 drop-shadow-lg z-10">🏆</div>
           <h2 className="text-3xl font-bold z-10">Quiz Finished!</h2>
-          <p className="text-slate-300 text-lg z-10">You got <span className="text-white font-extrabold text-2xl">{score}</span> out of 10 correct!</p>
+          <p className="text-slate-300 text-lg z-10">
+            You got <span className="text-white font-extrabold text-2xl">{score}</span> out of 10 correct!
+          </p>
           <button
             onClick={() => setGameStarted(false)}
             className="w-full h-14 mt-4 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 font-bold text-lg active:scale-95 transition-all shadow-[0_0_20px_rgba(139,92,246,0.3)] z-10"
@@ -269,12 +284,11 @@ const SongGuessingApp: React.FC = () => {
             disabled={!currentQuestion}
             onClick={() => {
               if (feedback) {
-                if (nextQuestionTimerRef.current) {
-                  clearTimeout(nextQuestionTimerRef.current);
-                }
+                // ✅ FIX 2: Cancel ALL timers (including revealDelayTimerRef) before jumping
+                cancelAllTimers();
+                if (audioRef.current) audioRef.current.pause();
                 startNewQuestion();
               } else {
-                // ✅ FIX: Read startTime from the ref, not from state
                 playSnippet(
                   currentQuestion!.target.path,
                   undefined,
