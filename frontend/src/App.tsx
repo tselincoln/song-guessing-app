@@ -19,9 +19,14 @@ const SongGuessingApp: React.FC = () => {
   const [selectedArtist, setSelectedArtist] = useState<string>('');
   const [gameStarted, setGameStarted] = useState(false);
   const [gameEnded, setGameEnded] = useState(false);
-  const [currentQuestion, setCurrentQuestion] = useState<{\n    target: Song;\n    options: Song[];\n    startTime: number;\n  } | null>(null);
+  const [currentQuestion, setCurrentQuestion] = useState<{
+    target: Song;
+    options: Song[];
+    startTime: number;
+  } | null>(null);
   const [score, setScore] = useState(0);
   const [questionCount, setQuestionCount] = useState(0);
+
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [difficulty, setDifficulty] = useState<'Easy' | 'Medium' | 'Hard' | 'Very Hard'>('Medium');
   
