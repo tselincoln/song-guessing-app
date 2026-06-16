@@ -30,6 +30,7 @@ const SongGuessingApp: React.FC = () => {
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playbackTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const nextQuestionTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}songs.json`)
@@ -154,7 +155,9 @@ const SongGuessingApp: React.FC = () => {
         if (audioRef.current) audioRef.current.pause();
         if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
       } else {
-        startNewQuestion();
+        nextQuestionTimerRef.current = setTimeout(() => {
+          startNewQuestion();
+        }, 6000);
       }
     }, 6000); // Increased to 6s to allow the 5s reveal to play fully
   };
@@ -162,6 +165,7 @@ const SongGuessingApp: React.FC = () => {
   useEffect(() => {
     return () => {
       if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
+      if (nextQuestionTimerRef.current) clearTimeout(nextQuestionTimerRef.current);
     };
   }, []);
 
@@ -232,7 +236,7 @@ const SongGuessingApp: React.FC = () => {
         <div className="w-full max-w-md flex flex-col items-center gap-6">
           <div className="flex justify-between items-center w-full bg-white/5 backdrop-blur-md border border-white/10 rounded-full px-5 py-3 text-sm font-medium text-slate-300 shadow-sm">
             <span className="truncate max-w-[100px]">{selectedArtist}</span>
-            <span className="bg-white/10 px-3 py-1 rounded-full text-white">{questionCount + 1} / 10</span>
+            <span className="bg-white/10 px-3 py-1 rounded-full text-white">{Math.min(questionCount + 1, 10)} / 10</span>
             <span className="flex items-center gap-1">★ {score}</span>
           </div>
 
@@ -252,6 +256,20 @@ const SongGuessingApp: React.FC = () => {
               </p>
             </div>
           </div>
+
+          <button 
+            disabled={!currentQuestion}
+            onClick={() => {
+              if (feedback) {
+                startNewQuestion();
+              } else {
+                playSnippet(currentQuestion.target.path);
+              }
+            }}
+            className="flex items-center justify-center gap-2 w-full h-12 rounded-2xl bg-white/5 border border-white/10 text-slate-300 font-medium transition-all active:scale-95 disabled:opacity-30 hover:bg-white/10"
+          >
+            <span className="text-lg">{feedback ? '⏭️' : '🔄'}</span> {feedback ? 'Next Question' : 'Replay Snippet'}
+          </button>
 
           <div className="flex flex-col gap-3 w-full mt-2">
             {currentQuestion?.options.map((song, i) => (
