@@ -5,14 +5,8 @@ interface Song {
   path: string;
   popularity: number;
 }
-
-interface ArtistData {
-  songs: Song[];
-}
-
-interface Manifest {
-  artists: Record<string, ArtistData>;
-}
+interface ArtistData { songs: Song[]; }
+interface Manifest { artists: Record<string, ArtistData>; }
 
 const SongGuessingApp: React.FC = () => {
   const [manifest, setManifest] = useState<Manifest | null>(null);
@@ -31,9 +25,10 @@ const SongGuessingApp: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playbackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const nextQuestionTimerRef = useRef<NodeJS.Timeout | null>(null);
-  // ✅ Store the reveal-delay timer separately so it can be cancelled on early skip
   const revealDelayTimerRef = useRef<NodeJS.Timeout | null>(null);
   const snippetStartTimeRef = useRef<number>(0);
+  // ✅ FIX: Track questionCount in a ref so timer callbacks always see the latest value
+  const questionCountRef = useRef<number>(0);
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}songs.json`)
@@ -59,9 +54,7 @@ const SongGuessingApp: React.FC = () => {
     if (!audioRef.current) return;
     const audio = audioRef.current;
 
-    if (playbackTimerRef.current) {
-      clearTimeout(playbackTimerRef.current);
-    }
+    if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
     audio.onloadedmetadata = null;
     audio.onseeked = null;
 
@@ -69,10 +62,7 @@ const SongGuessingApp: React.FC = () => {
     const fullPath = `${import.meta.env.BASE_URL}${cleanPath}`;
 
     audio.volume = 0;
-
-    if (audio.src !== fullPath) {
-      audio.src = fullPath;
-    }
+    if (audio.src !== fullPath) audio.src = fullPath;
 
     const playPromise = audio.play();
 
@@ -88,7 +78,6 @@ const SongGuessingApp: React.FC = () => {
         startTime = Math.max(0.001, Math.random() * safeDuration);
         snippetStartTimeRef.current = startTime;
       }
-
       audio.currentTime = startTime;
     };
 
@@ -107,20 +96,10 @@ const SongGuessingApp: React.FC = () => {
     };
   };
 
-  // ✅ Central cleanup: cancel ALL pending timers and stop audio
   const cancelAllTimers = () => {
-    if (playbackTimerRef.current) {
-      clearTimeout(playbackTimerRef.current);
-      playbackTimerRef.current = null;
-    }
-    if (revealDelayTimerRef.current) {
-      clearTimeout(revealDelayTimerRef.current);
-      revealDelayTimerRef.current = null;
-    }
-    if (nextQuestionTimerRef.current) {
-      clearTimeout(nextQuestionTimerRef.current);
-      nextQuestionTimerRef.current = null;
-    }
+    if (playbackTimerRef.current) { clearTimeout(playbackTimerRef.current); playbackTimerRef.current = null; }
+    if (revealDelayTimerRef.current) { clearTimeout(revealDelayTimerRef.current); revealDelayTimerRef.current = null; }
+    if (nextQuestionTimerRef.current) { clearTimeout(nextQuestionTimerRef.current); nextQuestionTimerRef.current = null; }
   };
 
   const startNewQuestion = () => {
@@ -135,7 +114,6 @@ const SongGuessingApp: React.FC = () => {
 
     const targetIndex = Math.floor(Math.random() * artistSongs.length);
     const target = artistSongs[targetIndex];
-
     const others = artistSongs.filter((_, i) => i !== targetIndex);
     const shuffledOthers = others.sort(() => 0.5 - Math.random()).slice(0, 3);
     const options = [target, ...shuffledOthers].sort(() => 0.5 - Math.random());
@@ -143,15 +121,16 @@ const SongGuessingApp: React.FC = () => {
     snippetStartTimeRef.current = 0;
     setCurrentQuestion({ target, options });
     setFeedback(null);
-
     playSnippet(target.path);
   };
 
   const handleStartGame = () => {
+    // ✅ Reset both the state and the ref together
+    questionCountRef.current = 0;
+    setQuestionCount(0);
     setGameStarted(true);
     setGameEnded(false);
     setScore(0);
-    setQuestionCount(0);
     startNewQuestion();
   };
 
@@ -160,18 +139,19 @@ const SongGuessingApp: React.FC = () => {
 
     const isCorrect = song.title === currentQuestion.target.title;
     setFeedback(isCorrect ? 'correct' : 'wrong');
-
     if (isCorrect) setScore(s => s + 1);
 
-    const newCount = questionCount + 1;
+    // ✅ FIX: Increment the ref synchronously — this is what timer callbacks will read
+    questionCountRef.current += 1;
+    const newCount = questionCountRef.current;
+    // Keep display state in sync
     setQuestionCount(newCount);
 
-    // ✅ FIX 1: Reveal plays from the SAME start time as the original snippet
     playSnippet(currentQuestion.target.path, 5, snippetStartTimeRef.current);
 
-    // ✅ FIX 2: Store this timer in a ref so early-skip can cancel it
     revealDelayTimerRef.current = setTimeout(() => {
-      if (newCount >= 10) {
+      // ✅ FIX: Read from the ref, not a captured local variable
+      if (questionCountRef.current >= 10) {
         setGameEnded(true);
         if (audioRef.current) audioRef.current.pause();
         cancelAllTimers();
@@ -284,7 +264,6 @@ const SongGuessingApp: React.FC = () => {
             disabled={!currentQuestion}
             onClick={() => {
               if (feedback) {
-                // ✅ FIX 2: Cancel ALL timers (including revealDelayTimerRef) before jumping
                 cancelAllTimers();
                 if (audioRef.current) audioRef.current.pause();
                 startNewQuestion();
